@@ -4,10 +4,10 @@ const Loader = () => {
   return (
     <div className='flex items-center gap-2'>
       <div className='h-7 w-8 object-contain rounded-full overflow-hidden'>
-        <img src={gif} alt=""  className='h-full w-full scale-150'/>
+        <img src={gif} alt="" className='h-full w-full scale-150' />
       </div>
-          thinking....
-        </div>
+
+    </div>
   )
 }
 

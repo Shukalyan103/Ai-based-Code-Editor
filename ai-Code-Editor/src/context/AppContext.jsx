@@ -7,9 +7,12 @@ import { AppContext } from "./AppContextInstance";
 
 export const AppContextProvider = (props) => {
 
-   const updateMessage = codeBase((state)=>state.updateMessage)
+    const updateMessage = codeBase((state) => state.updateMessage)
     const editorRef = useRef(null)
-    const [loading,setLoading]=useState(false)
+    const [loading, setLoading] = useState(false)
+    const [fileCount, setFileCount] = useState(0)
+
+    const [popupOpen, setPopUpOpen] = useState('')
 
     const getSelectedtext = () => {
         const editor = editorRef.current
@@ -47,13 +50,22 @@ export const AppContextProvider = (props) => {
         }
         try {
             const currentActiveProject = codeBase.getState().activeProject
-            
+            const store = codeBase.getState()
+            console.log(store)
+
             // Format prompt beautifully to display in the chat panel
-            const displayPrompt = code 
+            const displayPrompt = code
                 ? `${promt}\n\nSelected Code:\n\`\`\`javascript\n${code}\n\`\`\``
                 : promt;
 
-            updateMessage(currentActiveProject, "user", displayPrompt)
+            store.updateMessage(currentActiveProject, {
+                "role": "user",
+                "content": displayPrompt
+            })
+            store.updateMessage(currentActiveProject, {
+                "role": "ai",
+                "content": " "
+            })
 
             setLoading(true)
 
@@ -67,12 +79,25 @@ export const AppContextProvider = (props) => {
             if (!res.ok) {
                 throw new Error(`HTTP error! status: ${res.status}`)
             }
-            const data = await res.json()
-            updateMessage(currentActiveProject, "ai", data)
-           
-            console.log(data)
+
+
+
+
+            const reader = res.body.getReader()
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break;
+                const chunk = decoder.decode(value)
+                store.appendMessageChunk(currentActiveProject, chunk)
+
+            }
+
+
+
             setLoading(false)
-            
+
         } catch (e) {
             console.error('Fetch error:', e)
             setLoading(false)
@@ -80,13 +105,18 @@ export const AppContextProvider = (props) => {
 
     }
 
-    const promtCode=async(promt)=>{
-        if(!promt){
+    const promtCode = async (promt) => {
+        if (!promt) {
             return
         }
-        try{
+        try {
             const currentActiveProject = codeBase.getState().activeProject
-            updateMessage(currentActiveProject, "user", promt)
+            const store = codeBase.getState()
+
+            store.updateMessage(currentActiveProject, {
+                role: "user",
+                content: promt
+            })
 
             setLoading(true)
 
@@ -101,15 +131,19 @@ export const AppContextProvider = (props) => {
                 throw new Error(`HTTP error! status: ${res.status}`)
             }
             const data = await res.json()
-            updateMessage(currentActiveProject, "ai", data)
-           
+
+            store.updateMessage(currentActiveProject, {
+                role: "ai",
+                content: data
+            })
+
             console.log(data)
             setLoading(false)
 
-        }catch(e){
+        } catch (e) {
             console.error('Promt Error:', e)
             setLoading(false)
-            
+
         }
     }
 
@@ -119,7 +153,7 @@ export const AppContextProvider = (props) => {
 
 
     const value = {
-        editorRef, getSelectedtext, editText, buttonPromtCode,loading,promtCode
+        editorRef, getSelectedtext, editText, buttonPromtCode, loading, promtCode, setFileCount, fileCount, popupOpen, setPopUpOpen
     }
     return (
         <AppContext.Provider value={value}>

@@ -28,7 +28,7 @@ const TranslateCode = () => {
     }
 
     const basePrompt = `Translate the selected code to ${targetLanguage}. Keep the logic identical but adapt it fully to ${targetLanguage} best practices.`;
-    const fullPrompt = customInstructions.trim() 
+    const fullPrompt = customInstructions.trim()
       ? `${basePrompt}\n\nAdditional instructions: ${customInstructions}`
       : basePrompt;
 
@@ -37,7 +37,7 @@ const TranslateCode = () => {
 
   return (
     <div className="flex flex-col h-full bg-[#121215] text-[#E4E4E7] p-5 gap-6">
-      
+
       {/* Description */}
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -51,7 +51,7 @@ const TranslateCode = () => {
 
       {/* Action Card */}
       <div className="bg-[#18181C] border border-[#27272A] rounded-xl p-4 flex flex-col gap-4 shadow-sm">
-        
+
         {/* Step 1 */}
         <div className="flex flex-col gap-2">
           <label className="text-[10px] font-bold uppercase tracking-wider text-[#71717A]">

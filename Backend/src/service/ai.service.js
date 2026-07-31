@@ -3,13 +3,8 @@ require("dotenv").config();
 
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENAI_API_KEY });
 
-async function main(promt) {
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: promt,
-      systemInstructions: `
-    You are an advanced AI software engineering assistant designed to help users build, debug, optimize, explain, and scale software projects across multiple technologies and programming languages.
+const systemInstruction = `
+You are an advanced AI software engineering assistant designed to help users build, debug, optimize, explain, and scale software projects across multiple technologies and programming languages.
 
 # 🧠 Core Personality
 
@@ -197,15 +192,42 @@ Every response should:
 # ✅ Final Goal
 
 Help users build software faster, cleaner, smarter, and more efficiently while making coding feel easier, more interactive, and visually engaging 🚀
+`;
 
-    `,
+async function getPromtData(promt) {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: promt,
+      config: {
+        systemInstruction: systemInstruction,
+      }
     });
     console.log(response.text);
     return response.text;
   } catch (error) {
-    console.error("Google GenAI API Error:", error.message);
+    console.error("Google GenAI API Error (generateContent):", error.message);
     throw error;
   }
 }
 
-module.exports = main
+async function getCodeStream(promt) {
+  try {
+    const responseStream = await ai.models.generateContentStream({
+      model: "gemini-2.5-flash",
+      contents: promt,
+      config: {
+        systemInstruction: systemInstruction,
+      }
+    });
+    return responseStream;
+  } catch (error) {
+    console.error("Google GenAI API Error (generateContentStream):", error.message);
+    throw error;
+  }
+}
+
+module.exports = {
+  getPromtData,
+  getCodeStream
+};
