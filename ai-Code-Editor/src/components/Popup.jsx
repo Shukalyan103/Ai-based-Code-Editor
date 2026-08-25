@@ -209,6 +209,53 @@ if (button) {
                 totalFilesCreated = 3;
             }
             else if (selectedTemplate === 'react') {
+                createFile(name, 'package.json');
+                updateCode(name, 'package.json', `{
+  "name": "${name.toLowerCase().replace(/[^a-z0-9-_]/g, '-')}",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}`);
+
+                createFile(name, 'index.html');
+                updateCode(name, 'index.html', `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${name}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>`);
+
+                createFile(name, 'vite.config.js');
+                updateCode(name, 'vite.config.js', `import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+  },
+});`);
+
                 createFile(name, 'src/main.jsx');
                 updateCode(name, 'src/main.jsx', `import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -232,12 +279,12 @@ export default function App() {
     <div className="container">
       <div className="react-logo">⚛️</div>
       <h1>React Workspace</h1>
-      <p>Start building your component-driven UI with AI support.</p>
+      <p>Start building your component-driven UI with AI support & WebContainer preview.</p>
       
       <div className="interactive">
         <button className="btn" onClick={() => {
           setCount(c => c + 1);
-          setMessage('State updated in real-time!');
+          setMessage('State updated in real-time with HMR!');
         }}>
           Count is {count}
         </button>
@@ -305,7 +352,7 @@ p {
   margin-top: 1rem;
 }
 `);
-                totalFilesCreated = 3;
+                totalFilesCreated = 6;
             }
             else if (selectedTemplate === 'algo') {
                 createFile(name, 'index.js');
