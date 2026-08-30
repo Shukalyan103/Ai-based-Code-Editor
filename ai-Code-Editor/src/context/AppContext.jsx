@@ -50,6 +50,10 @@ export const AppContextProvider = (props) => {
         }
         try {
             const currentActiveProject = codeBase.getState().activeProject
+            if (!currentActiveProject) {
+                console.warn('No active project selected to associate chat messages with.');
+                return;
+            }
             const store = codeBase.getState()
             console.log(store)
 
@@ -80,9 +84,6 @@ export const AppContextProvider = (props) => {
                 throw new Error(`HTTP error! status: ${res.status}`)
             }
 
-
-
-
             const reader = res.body.getReader()
             const decoder = new TextDecoder();
 
@@ -91,10 +92,7 @@ export const AppContextProvider = (props) => {
                 if (done) break;
                 const chunk = decoder.decode(value)
                 store.appendMessageChunk(currentActiveProject, chunk)
-
             }
-
-
 
             setLoading(false)
 
@@ -111,6 +109,10 @@ export const AppContextProvider = (props) => {
         }
         try {
             const currentActiveProject = codeBase.getState().activeProject
+            if (!currentActiveProject) {
+                console.warn('No active project selected to associate chat messages with.');
+                return;
+            }
             const store = codeBase.getState()
 
             store.updateMessage(currentActiveProject, {

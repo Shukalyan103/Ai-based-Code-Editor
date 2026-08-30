@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { AppContext } from '../context/AppContextInstance';
 import Popup from '../components/Popup';
-import ImportZip from '../components/ImportZip';
+import ImportZip from '../components/importing ZIp and Folder/ImportZip';
 import PopupDeleRename from '../components/PopupDeleRename';
 
 const Dashboard = () => {

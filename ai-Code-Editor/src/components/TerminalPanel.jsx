@@ -1,42 +1,158 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { codeBase } from '../store/codeBase';
+import { projectRuntime } from '../services/webcontainer/projectRuntime';
 import {
   Terminal as TerminalIcon,
   Trash2,
   RotateCw,
-  ArrowDownCircle,
   Copy,
   Check,
+  ArrowDown,
 } from 'lucide-react';
 
-/**
- * Basic ANSI escape sequence stripper / simple parser for terminal logs.
- */
-function cleanAnsi(text) {
-  if (typeof text !== 'string') return '';
-  return text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-}
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import '@xterm/xterm/css/xterm.css';
 
 const TerminalPanel = ({ className = '' }) => {
-  const terminalLogs = codeBase((state) => state.runtime?.terminalLogs) || [];
+  const terminalRef = useRef(null);
+  const xtermInstanceRef = useRef(null);
+  const fitAddonRef = useRef(null);
+
   const status = codeBase((state) => state.runtime?.status) || 'idle';
   const clearTerminalLogs = codeBase((state) => state.clearTerminalLogs);
   const restartRuntime = codeBase((state) => state.restartRuntime);
 
-  const [autoScroll, setAutoScroll] = useState(true);
   const [copied, setCopied] = useState(false);
-  const bottomRef = useRef(null);
-  const containerRef = useRef(null);
 
   useEffect(() => {
-    if (autoScroll && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!terminalRef.current) return;
+
+    // Initialize xterm Terminal instance
+    const term = new Terminal({
+      cursorBlink: true,
+      cursorStyle: 'bar',
+      fontSize: 13,
+      fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
+      lineHeight: 1.25,
+      convertEol: true,
+      scrollback: 5000,
+      disableStdin: true,
+      theme: {
+        background: '#0e0e11',
+        foreground: '#d4d4d8',
+        cursor: '#38bdf8',
+        selectionBackground: 'rgba(56, 189, 248, 0.25)',
+        black: '#1e1e24',
+        red: '#f87171',
+        green: '#4ade80',
+        yellow: '#facc15',
+        blue: '#60a5fa',
+        magenta: '#c084fc',
+        cyan: '#22d3ee',
+        white: '#f4f4f5',
+        brightBlack: '#71717a',
+        brightRed: '#ef4444',
+        brightGreen: '#22c55e',
+        brightYellow: '#eab308',
+        brightBlue: '#3b82f6',
+        brightMagenta: '#a855f7',
+        brightCyan: '#06b6d4',
+        brightWhite: '#ffffff',
+      },
+    });
+
+    const fitAddon = new FitAddon();
+    const webLinksAddon = new WebLinksAddon();
+
+    term.loadAddon(fitAddon);
+    term.loadAddon(webLinksAddon);
+
+    term.open(terminalRef.current);
+    fitAddon.fit();
+
+    xtermInstanceRef.current = term;
+    fitAddonRef.current = fitAddon;
+
+    // Write existing logs into the terminal instance
+    const initialLogs = codeBase.getState().runtime?.terminalLogs || [];
+    if (initialLogs.length > 0) {
+      for (const log of initialLogs) {
+        term.write(log.text);
+      }
+    } else {
+      term.writeln('\x1b[90m[Terminal initialized. Waiting for process output...]\x1b[0m');
     }
-  }, [terminalLogs, autoScroll]);
+
+    // Subscribe to live incoming log streams from projectRuntime
+    const unsubscribeLogs = projectRuntime.subscribeLogs((logEntries) => {
+      if (!term) return;
+      const entries = Array.isArray(logEntries) ? logEntries : [logEntries];
+      for (const entry of entries) {
+        if (entry?.text) {
+          term.write(entry.text);
+        }
+      }
+    });
+
+    // ResizeObserver to automatically adjust terminal dimensions on panel resize
+    const resizeObserver = new ResizeObserver(() => {
+      try {
+        if (fitAddonRef.current && terminalRef.current?.clientWidth > 0) {
+          fitAddonRef.current.fit();
+        }
+      } catch (err) {
+        console.warn('Terminal fit error:', err);
+      }
+    });
+
+    resizeObserver.observe(terminalRef.current);
+
+    // Initial fit with small delay to ensure container layout dimensions are calculated
+    const initialTimer = setTimeout(() => {
+      try {
+        fitAddon.fit();
+      } catch (e) {}
+    }, 50);
+
+    return () => {
+      clearTimeout(initialTimer);
+      unsubscribeLogs();
+      resizeObserver.disconnect();
+      term.dispose();
+      xtermInstanceRef.current = null;
+      fitAddonRef.current = null;
+    };
+  }, []);
+
+  const handleClear = () => {
+    if (xtermInstanceRef.current) {
+      xtermInstanceRef.current.clear();
+    }
+    clearTerminalLogs();
+  };
+
+  const handleScrollToBottom = () => {
+    if (xtermInstanceRef.current) {
+      xtermInstanceRef.current.scrollToBottom();
+    }
+  };
 
   const handleCopyLogs = () => {
-    const rawText = terminalLogs.map((l) => cleanAnsi(l.text)).join('');
-    navigator.clipboard.writeText(rawText);
+    if (xtermInstanceRef.current) {
+      const selection = xtermInstanceRef.current.getSelection();
+      if (selection) {
+        navigator.clipboard.writeText(selection);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        return;
+      }
+    }
+
+    const allLogs = codeBase.getState().runtime?.terminalLogs || [];
+    const text = allLogs.map((l) => l.text).join('');
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -61,28 +177,26 @@ const TerminalPanel = ({ className = '' }) => {
   };
 
   return (
-    <div className={`h-full flex flex-col bg-[#0e0e11] text-zinc-200 font-mono select-text border-t border-[#1e1e24] ${className}`}>
+    <div className={`h-full w-full flex flex-col bg-[#0e0e11] text-zinc-200 select-text overflow-hidden ${className}`}>
       {/* Terminal Toolbar */}
-      <div className="h-9 bg-[#141418] border-b border-[#23232a] flex items-center justify-between px-3 shrink-0">
+      <div className="h-9 bg-[#141418] border-b border-[#23232a] flex items-center justify-between px-3 shrink-0 select-none">
         <div className="flex items-center gap-2">
           <TerminalIcon className="w-4 h-4 text-emerald-400" />
-          <span className="text-xs font-semibold text-zinc-300 font-sans tracking-wide">Terminal Output</span>
+          <span className="text-xs font-semibold text-zinc-300 font-sans tracking-wide">Terminal</span>
           {getStatusBadge()}
         </div>
 
         <div className="flex items-center gap-1">
           <button
-            title={autoScroll ? 'Auto-scroll is ON' : 'Auto-scroll is OFF'}
-            onClick={() => setAutoScroll(!autoScroll)}
-            className={`p-1 rounded text-xs transition-colors flex items-center gap-1 ${
-              autoScroll ? 'text-emerald-400 bg-emerald-500/10' : 'text-zinc-500 hover:text-zinc-300'
-            }`}
+            title="Scroll to bottom"
+            onClick={handleScrollToBottom}
+            className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
           >
-            <ArrowDownCircle className="w-3.5 h-3.5" />
+            <ArrowDown className="w-3.5 h-3.5" />
           </button>
 
           <button
-            title="Copy logs"
+            title="Copy selection or all logs"
             onClick={handleCopyLogs}
             className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
           >
@@ -99,7 +213,7 @@ const TerminalPanel = ({ className = '' }) => {
 
           <button
             title="Clear terminal"
-            onClick={clearTerminalLogs}
+            onClick={handleClear}
             className="p-1 rounded text-zinc-400 hover:text-rose-400 hover:bg-zinc-800 transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -107,39 +221,9 @@ const TerminalPanel = ({ className = '' }) => {
         </div>
       </div>
 
-      {/* Terminal Content Stream */}
-      <div
-        ref={containerRef}
-        className="flex-1 p-3 overflow-y-auto overflow-x-auto text-[13px] leading-relaxed select-text space-y-0.5"
-      >
-        {terminalLogs.length === 0 ? (
-          <div className="text-zinc-500 text-xs py-4 select-none italic">
-            Waiting for process execution...
-          </div>
-        ) : (
-          terminalLogs.map((log, index) => {
-            const cleanText = cleanAnsi(log.text);
-            const isError = log.stream === 'stderr';
-            const isSystem = log.stream === 'system';
-
-            let colorClass = 'text-zinc-300';
-            if (isError) colorClass = 'text-rose-400 font-medium';
-            else if (isSystem) colorClass = 'text-cyan-300';
-            else if (cleanText.includes('> ') || cleanText.includes('npm run') || cleanText.includes('vite')) {
-              colorClass = 'text-amber-300 font-semibold';
-            }
-
-            return (
-              <span
-                key={index}
-                className={`whitespace-pre-wrap break-all inline-block w-full ${colorClass}`}
-              >
-                {cleanText}
-              </span>
-            );
-          })
-        )}
-        <div ref={bottomRef} />
+      {/* xterm.js DOM Mount Target */}
+      <div className="flex-1 w-full h-[calc(100%-36px)] p-2 bg-[#0e0e11] overflow-hidden">
+        <div ref={terminalRef} className="w-full h-full" />
       </div>
     </div>
   );

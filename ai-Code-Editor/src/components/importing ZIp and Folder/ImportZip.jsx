@@ -1,6 +1,5 @@
 import JSZip, { loadAsync } from "jszip";
-import { useState } from "react";
-import { codeBase } from "../store/codeBase";
+import { useState } from "react";import { codeBase } from "../../store/codeBase";
 
 
 
@@ -9,6 +8,7 @@ import { codeBase } from "../store/codeBase";
 const ImportZip = () => {
 
     const [contextMenuEnable, setContextMenuEnable] = useState(null)
+    codeBase
 
     const hidecontext = () => {
         if (contextMenuEnable === 'context') {

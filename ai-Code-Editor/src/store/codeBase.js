@@ -292,29 +292,56 @@ export const codeBase = create(
         },
 
         updateMessage: (projectName, messages) =>
-          set((state) => ({
-            project: {
-              ...state.project,
-              [projectName]: {
-                ...state.project[projectName],
-                message: [
-                  ...state.project[projectName].message,
-                  messages,
-                ],
+          set((state) => {
+            if (!projectName || !state.project?.[projectName]) {
+              return state;
+            }
+            const currentMessages = Array.isArray(state.project[projectName].message)
+              ? state.project[projectName].message
+              : [];
+
+            return {
+              project: {
+                ...state.project,
+                [projectName]: {
+                  ...state.project[projectName],
+                  message: [
+                    ...currentMessages,
+                    messages,
+                  ],
+                },
               },
-            },
-          })),
+            };
+          }),
 
         appendMessageChunk: (projectName, chunk) =>
           set((state) => {
-            const messages = state.project[projectName].message;
+            if (!projectName || !state.project?.[projectName]) {
+              return state;
+            }
+            const messages = Array.isArray(state.project[projectName].message)
+              ? state.project[projectName].message
+              : [];
+
+            if (messages.length === 0) {
+              return {
+                project: {
+                  ...state.project,
+                  [projectName]: {
+                    ...state.project[projectName],
+                    message: [{ role: "ai", content: chunk }],
+                  },
+                },
+              };
+            }
+
             const lastMessage = messages[messages.length - 1];
 
             const updateMessage = [
               ...messages.slice(0, -1),
               {
                 ...lastMessage,
-                content: lastMessage.content + chunk,
+                content: (lastMessage?.content || "") + chunk,
               },
             ];
 
